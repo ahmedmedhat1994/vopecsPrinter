@@ -1,0 +1,19 @@
+{
+  "version": "1.0.1",
+  "notes": "Bug fixes and improvements",
+  "pub_date": "2024-12-03T12:00:00Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "SIGNATURE_WILL_BE_HERE_AFTER_BUILD",
+      "url": "https://pos.megacaresa.com/vopecsprinter/releases/VopecsPrinter_1.0.1_aarch64.app.tar.gz"
+    },
+    "darwin-x86_64": {
+      "signature": "SIGNATURE_WILL_BE_HERE_AFTER_BUILD",
+      "url": "https://pos.megacaresa.com/vopecsprinter/releases/VopecsPrinter_1.0.1_x64.app.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "SIGNATURE_WILL_BE_HERE_AFTER_BUILD",
+      "url": "https://pos.megacaresa.com/vopecsprinter/releases/VopecsPrinter_1.0.1_x64-setup.nsis.zip"
+    }
+  }
+}

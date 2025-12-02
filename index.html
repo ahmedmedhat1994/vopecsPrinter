@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VopecsPrinter</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <h1 class="title">Printer Configuration</h1>
+      <div class="header-actions">
+        <span class="version-badge">v1.0.0</span>
+        <button id="toggle-autostart" class="btn btn-warning">
+          <span class="icon">&#x23FB;</span> Disable Autostart
+        </button>
+        <button id="check-updates" class="btn btn-primary">
+          <span class="icon">&#x1F4E6;</span> Check Updates
+        </button>
+        <span id="service-status" class="status-indicator active">
+          <span class="dot"></span> Print Service Active
+        </span>
+      </div>
+    </header>
+
+    <!-- Connection Status -->
+    <section class="connection-section">
+      <div class="connection-header">
+        <div class="connection-status">
+          <span class="status-dot connected"></span>
+          <span class="status-text">Connected & Polling</span>
+        </div>
+        <button id="configure-btn" class="btn-link">
+          <span class="icon">&#x2699;</span> Configure
+        </button>
+      </div>
+      <div class="connection-details">
+        <div>URL: <span id="server-url" class="text-primary">Not configured</span></div>
+        <div>Key: <span id="api-key-display" class="text-danger">Not configured</span></div>
+      </div>
+    </section>
+
+    <!-- Configuration Modal -->
+    <div id="config-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>API Configuration</h2>
+          <button class="modal-close" id="close-modal">&times;</button>
+        </div>
+        <form id="config-form">
+          <div class="form-group">
+            <label>Domain URL</label>
+            <input type="url" id="domain-url" placeholder="https://your-pos-api.com" required>
+          </div>
+          <div class="form-group">
+            <label>API Key</label>
+            <input type="text" id="api-key" placeholder="Enter your API key" required>
+          </div>
+          <div class="form-group">
+            <label>Polling Interval (seconds)</label>
+            <input type="number" id="polling-interval" value="3" min="1" max="60">
+          </div>
+          <div class="form-actions">
+            <button type="button" id="test-connection" class="btn btn-secondary">Test Connection</button>
+            <button type="submit" class="btn btn-success">Save & Connect</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Printer Setup -->
+    <section class="card">
+      <div class="card-header">
+        <h2><span class="icon">&#x1F5A8;</span> Printer Setup</h2>
+        <button id="refresh-printers" class="btn btn-success">
+          <span class="icon">&#x21BB;</span> Refresh Printers
+        </button>
+      </div>
+
+      <div class="info-box">
+        <span class="icon">&#x2139;</span>
+        Map each POS Station to a local printer on your system.
+      </div>
+
+      <div class="mappings-section">
+        <h3>Printer Mappings (<span id="mappings-count">0</span> found)</h3>
+        <table class="mappings-table">
+          <thead>
+            <tr>
+              <th>POS STATION</th>
+              <th>PRINTER ALIAS</th>
+              <th>ASSIGNED LOCAL PRINTER</th>
+              <th>THERMAL</th>
+              <th>TEST</th>
+            </tr>
+          </thead>
+          <tbody id="mappings-body">
+            <tr>
+              <td colspan="5" class="empty-row">No printers configured. Click "Refresh Printers" to fetch from API.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Service Controls -->
+    <section class="service-controls">
+      <button id="toggle-service" class="btn btn-service btn-danger">
+        <span class="icon">&#x25A0;</span> Stop Service
+      </button>
+      <button id="minimize-tray" class="btn btn-secondary">
+        <span class="icon">&#x2014;</span> Minimize to Tray
+      </button>
+    </section>
+
+    <!-- Status Indicators -->
+    <section class="status-section">
+      <div class="status-row success">
+        <span class="icon">&#x2714;</span>
+        <input type="checkbox" id="service-active-check" checked>
+        <span>Print Service Active - Polling for print jobs every <span id="poll-interval-display">3</span> seconds</span>
+      </div>
+      <div class="status-row info">
+        <span class="icon">&#x25B6;</span>
+        <input type="checkbox" id="polling-active-check" checked>
+        <span>Polling active - Last check: <span id="last-check-time">--:--:-- --</span></span>
+      </div>
+      <div class="status-row warning">
+        <span class="icon">&#x23FB;</span>
+        <span>Autostart: <span id="autostart-status">Disabled</span></span>
+      </div>
+    </section>
+
+    <!-- Cash Drawer Settings -->
+    <section class="card">
+      <div class="card-header">
+        <h2><span class="icon">&#x1F4B0;</span> Cash Drawer Settings</h2>
+      </div>
+
+      <div class="info-box">
+        <span class="icon">&#x2139;</span>
+        Configure cash drawer behavior after printing receipts.
+      </div>
+
+      <div class="drawer-settings">
+        <div class="setting-row">
+          <label><span class="icon">&#x2699;</span> Open Drawer After Print</label>
+          <label class="switch">
+            <input type="checkbox" id="open-drawer-toggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="setting-row">
+          <label><span class="icon">&#x229A;</span> Drawer Pin</label>
+          <div class="radio-group">
+            <label><input type="radio" name="drawer-pin" value="0" checked> Pin 1</label>
+            <label><input type="radio" name="drawer-pin" value="1"> Pin 2</label>
+          </div>
+        </div>
+      </div>
+
+      <div id="drawer-info" class="info-box info hidden">
+        <span class="icon">&#x2139;</span>
+        Cash drawer will automatically open after each successful print using <strong>Pin <span id="selected-pin">1</span></strong>
+      </div>
+    </section>
+
+    <!-- System Logs -->
+    <section class="card logs-card">
+      <div class="card-header">
+        <h2>
+          <span class="icon">&#x1F4DD;</span> System Logs
+          <span class="os-badge">macOS</span>
+        </h2>
+        <div class="logs-actions">
+          <span id="logs-version">v1.0.0</span>
+          <button id="toggle-fullscreen" class="btn btn-sm">
+            <span class="icon">&#x26F6;</span> Full Screen
+          </button>
+        </div>
+      </div>
+      <div id="logs-container" class="logs-container">
+        <div class="log-entry">[Starting VopecsPrinter...]</div>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

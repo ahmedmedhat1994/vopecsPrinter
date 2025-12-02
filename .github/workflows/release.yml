@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin'
+          - platform: 'macos-latest'
+            args: '--target x86_64-apple-darwin'
+          - platform: 'windows-latest'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'VopecsPrinter v__VERSION__'
+          releaseBody: 'See the assets to download and install this version.'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
+
+  create-latest-json:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download ${{ github.ref_name }} -D ./assets
+
+      - name: Create latest.json
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+
+          # Read signatures
+          MAC_ARM_SIG=$(cat ./assets/VopecsPrinter.app.tar.gz.sig 2>/dev/null || echo "")
+          MAC_X64_SIG=$(cat ./assets/VopecsPrinter.app.tar.gz.sig 2>/dev/null || echo "")
+          WIN_SIG=$(cat ./assets/VopecsPrinter_${VERSION}_x64-setup.nsis.zip.sig 2>/dev/null || echo "")
+
+          cat > latest.json << EOF
+          {
+            "version": "${VERSION}",
+            "notes": "VopecsPrinter ${VERSION}",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "darwin-aarch64": {
+                "signature": "${MAC_ARM_SIG}",
+                "url": "https://github.com/ahmedmedhat1994/vopecsPrinter/releases/download/v${VERSION}/VopecsPrinter.app.tar.gz"
+              },
+              "darwin-x86_64": {
+                "signature": "${MAC_X64_SIG}",
+                "url": "https://github.com/ahmedmedhat1994/vopecsPrinter/releases/download/v${VERSION}/VopecsPrinter.app.tar.gz"
+              },
+              "windows-x86_64": {
+                "signature": "${WIN_SIG}",
+                "url": "https://github.com/ahmedmedhat1994/vopecsPrinter/releases/download/v${VERSION}/VopecsPrinter_${VERSION}_x64-setup.nsis.zip"
+              }
+            }
+          }
+          EOF
+
+          cat latest.json
+
+      - name: Upload latest.json to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.ref_name }} latest.json --clobber

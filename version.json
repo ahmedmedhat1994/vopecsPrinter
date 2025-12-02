@@ -1,0 +1,9 @@
+{
+  "latest_version": "1.0.0",
+  "release_date": "2024-12-03",
+  "changelog": "Initial release",
+  "download_info": {
+    "mac": "https://pos.megacaresa.com/vopecsprinter/VopecsPrinter.dmg",
+    "windows": "https://pos.megacaresa.com/vopecsprinter/VopecsPrinter.exe"
+  }
+}
