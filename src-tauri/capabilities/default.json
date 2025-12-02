@@ -41,6 +41,13 @@
     "opener:allow-open-url",
     "shell:default",
     "shell:allow-execute",
-    "shell:allow-spawn"
+    "shell:allow-spawn",
+    "updater:default",
+    "updater:allow-check",
+    "updater:allow-download",
+    "updater:allow-download-and-install",
+    "process:default",
+    "process:allow-restart",
+    "process:allow-exit"
   ]
 }
