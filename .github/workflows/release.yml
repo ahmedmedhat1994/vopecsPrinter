@@ -80,10 +80,10 @@ jobs:
         run: |
           VERSION=${{ steps.version.outputs.version }}
 
-          # Read signatures
-          MAC_ARM_SIG=$(cat ./assets/VopecsPrinter.app.tar.gz.sig 2>/dev/null || echo "")
-          MAC_X64_SIG=$(cat ./assets/VopecsPrinter.app.tar.gz.sig 2>/dev/null || echo "")
-          WIN_SIG=$(cat ./assets/VopecsPrinter_${VERSION}_x64-setup.nsis.zip.sig 2>/dev/null || echo "")
+          # Read signatures - use correct file names from Tauri build
+          MAC_ARM_SIG=$(cat ./assets/VopecsPrinter_aarch64.app.tar.gz.sig 2>/dev/null || echo "")
+          MAC_X64_SIG=$(cat ./assets/VopecsPrinter_x64.app.tar.gz.sig 2>/dev/null || echo "")
+          WIN_SIG=$(cat ./assets/VopecsPrinter_${VERSION}_x64-setup.exe.sig 2>/dev/null || echo "")
 
           cat > latest.json << EOF
           {
@@ -93,15 +93,15 @@ jobs:
             "platforms": {
               "darwin-aarch64": {
                 "signature": "${MAC_ARM_SIG}",
-                "url": "https://github.com/ahmedmedhat1994/vopecsPrinter/releases/download/v${VERSION}/VopecsPrinter.app.tar.gz"
+                "url": "https://github.com/ahmedmedhat1994/vopecsPrinter/releases/download/v${VERSION}/VopecsPrinter_aarch64.app.tar.gz"
               },
               "darwin-x86_64": {
                 "signature": "${MAC_X64_SIG}",
-                "url": "https://github.com/ahmedmedhat1994/vopecsPrinter/releases/download/v${VERSION}/VopecsPrinter.app.tar.gz"
+                "url": "https://github.com/ahmedmedhat1994/vopecsPrinter/releases/download/v${VERSION}/VopecsPrinter_x64.app.tar.gz"
               },
               "windows-x86_64": {
                 "signature": "${WIN_SIG}",
-                "url": "https://github.com/ahmedmedhat1994/vopecsPrinter/releases/download/v${VERSION}/VopecsPrinter_${VERSION}_x64-setup.nsis.zip"
+                "url": "https://github.com/ahmedmedhat1994/vopecsPrinter/releases/download/v${VERSION}/VopecsPrinter_${VERSION}_x64-setup.exe"
               }
             }
           }
