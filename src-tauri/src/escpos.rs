@@ -147,17 +147,23 @@ impl ThermalImage {
     /// Load image from URL and convert to ESC/POS
     pub async fn url_to_escpos(url: &str, max_width: u32) -> Result<Vec<u8>> {
         // Download image
+        println!("Downloading image from URL: {}", url);
         let response = reqwest::get(url).await
             .context("Failed to download image")?;
 
         let image_data = response.bytes().await
             .context("Failed to read image data")?;
+        println!("Downloaded {} bytes from URL", image_data.len());
 
         // Load image
         let img = image::load_from_memory(&image_data)
             .context("Failed to load image from memory")?;
+        println!("Loaded image from URL: {}x{} pixels", img.width(), img.height());
 
-        Self::to_escpos_bitmap(&img, max_width)
+        let result = Self::to_escpos_bitmap(&img, max_width)?;
+        println!("Generated {} bytes of ESC/POS commands", result.len());
+
+        Ok(result)
     }
 
     /// Create a simple test pattern for thermal printer

@@ -206,8 +206,12 @@ pub fn print_base64_image(printer_name: &str, base64_image: &str, max_width: u32
 
 /// Print image from URL to thermal printer
 pub async fn print_url_image(printer_name: &str, url: &str, max_width: u32) -> Result<()> {
+    println!("🖨️ Printing image from URL: {}", url);
     let escpos_data = ThermalImage::url_to_escpos(url, max_width).await?;
+    println!("Printing raw data to printer: {}", printer_name);
     print_raw(printer_name, &escpos_data)?;
+    println!("✅ Print command executed successfully");
+    println!("✅ Image from URL printed successfully");
     Ok(())
 }
 
@@ -265,8 +269,10 @@ pub fn cut_paper(printer_name: &str) -> Result<()> {
 
 /// Open cash drawer
 pub fn open_drawer(printer_name: &str, pin: u8) -> Result<()> {
+    println!("💰 Opening cash drawer on printer: {} (pin: {})", printer_name, pin);
     let drawer_data = generate_drawer_command(pin);
     print_raw(printer_name, &drawer_data)?;
+    println!("✅ Cash drawer opened successfully");
     Ok(())
 }
 

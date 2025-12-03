@@ -1,6 +1,6 @@
 [package]
 name = "vopecs-printer"
-version = "1.0.1"
+version = "1.0.2"
 description = "VopecsPOS Thermal Printer Manager"
 authors = ["Vopecs"]
 edition = "2021"

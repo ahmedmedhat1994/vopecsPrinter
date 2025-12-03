@@ -261,9 +261,8 @@ async function pollJobs() {
     log('Processing ' + jobs.length + ' print jobs');
 
     for (const job of jobs) {
-      if (job.status === 'pending') {
-        await processJob(job);
-      }
+      // Process all jobs returned from API (server marks them as 'printing' when pulled)
+      await processJob(job);
     }
   } catch (error) {
     log('Poll failed: ' + error, 'error');
@@ -271,7 +270,11 @@ async function pollJobs() {
 }
 
 async function processJob(job) {
-  const printerApiName = job.printer_name || job.printerName || job.printer;
+  // Get printer name from various possible locations in the response
+  const printerApiName = job.printer_name || job.printerName ||
+                         (job.printer && job.printer.name) ||
+                         (job.station && job.station.name) ||
+                         job.printer;
   const localPrinter = config.printerMappings[printerApiName];
 
   if (!localPrinter) {
@@ -297,6 +300,19 @@ async function processJob(job) {
         printerName: localPrinter,
         base64Image: job.image
       });
+    } else if (job.image_path) {
+      // Image from URL (common format from VopecsPOS)
+      log('🖨️ Processing job for printer: ' + localPrinter);
+      log('🖨️ Printing image from URL: ' + job.image_path);
+      log('Downloading image from URL: ' + job.image_path);
+      const startTime = Date.now();
+      await invoke('print_image_from_url', {
+        printerName: localPrinter,
+        url: job.image_path
+      });
+      const elapsed = Date.now() - startTime;
+      log('✅ Print command executed successfully (' + elapsed + 'ms)');
+      log('✅ Image from URL printed successfully');
     } else if (job.pdf) {
       // PDF printing (URL or base64)
       if (job.pdf.startsWith('http')) {
@@ -335,8 +351,8 @@ async function processJob(job) {
       throw new Error('Unknown job type');
     }
 
-    // Print copies if specified
-    const copies = job.copies || 1;
+    // Print copies if specified (check job.copies, station.print_copies)
+    const copies = job.copies || (job.station && job.station.print_copies) || 1;
     for (let i = 1; i < copies; i++) {
       log('Printing copy ' + (i + 1) + ' of ' + copies);
       if (job.image) {
@@ -344,8 +360,12 @@ async function processJob(job) {
           printerName: localPrinter,
           base64Image: job.image
         });
+      } else if (job.image_path) {
+        await invoke('print_image_from_url', {
+          printerName: localPrinter,
+          url: job.image_path
+        });
       }
-      // Add other copy printing as needed
     }
 
     await invoke('update_job_status', {
@@ -354,14 +374,19 @@ async function processJob(job) {
       reason: null
     });
 
-    log('Job #' + job.id + ' completed successfully');
+    log('✅ Print completed successfully!');
+    log('Updating job status to \'done\' at: ' + config.domainUrl + '/api/print-jobs/' + job.id);
 
     if (config.openDrawerAfterPrint) {
-      log('Opening cash drawer after successful print (Pin ' + (config.drawerPin === 0 ? '1' : '2') + ')');
+      const pin = config.drawerPin === 0 ? 1 : 2;
+      log('💰 Drawer decision - should_open: true, pin: ' + pin + ', config_value: ' + config.openDrawerAfterPrint);
+      log('💰 Opening cash drawer after successful print (pin: ' + pin + ')');
+      log('Opening cash drawer on printer: ' + localPrinter + ' (pin: ' + pin + ')');
       await invoke('open_drawer', {
         printerName: localPrinter,
         pin: config.drawerPin
       });
+      log('✅ Cash drawer opened successfully');
     }
   } catch (error) {
     log('Failed to process job #' + job.id + ': ' + error, 'error');
@@ -378,6 +403,7 @@ async function processJob(job) {
 // Determine job type from job data
 function getJobType(job) {
   if (job.image) return 'image';
+  if (job.image_path) return 'image_url';
   if (job.pdf) return 'pdf';
   if (job.html) return 'html';
   if (job.url) return 'url';

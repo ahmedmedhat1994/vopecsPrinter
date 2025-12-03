@@ -39,6 +39,28 @@ impl ApiPrinter {
     }
 }
 
+/// Nested printer info from API response
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PrinterInfo {
+    #[serde(default)]
+    pub id: Option<i64>,
+    #[serde(default)]
+    pub name: Option<String>,
+}
+
+/// Nested station info from API response
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct StationInfo {
+    #[serde(default)]
+    pub id: Option<i64>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub print_copies: Option<i32>,
+    #[serde(default)]
+    pub auto_print: Option<bool>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PrintJob {
     #[serde(default)]
@@ -46,15 +68,19 @@ pub struct PrintJob {
     #[serde(default)]
     pub job_id: Option<String>,
     #[serde(default)]
-    pub printer: Option<String>,
+    pub printer: Option<PrinterInfo>,
     #[serde(default)]
     pub printer_name: Option<String>,
+    #[serde(default)]
+    pub station: Option<StationInfo>,
     #[serde(default, rename = "type")]
     pub job_type: Option<String>,
     #[serde(default)]
     pub status: Option<String>,
     #[serde(default)]
     pub image: Option<String>,
+    #[serde(default)]
+    pub image_path: Option<String>,
     #[serde(default)]
     pub pdf: Option<String>,
     #[serde(default)]
@@ -71,12 +97,27 @@ pub struct PrintJob {
 
 impl PrintJob {
     pub fn get_printer_name(&self) -> Option<String> {
-        self.printer_name.clone().or(self.printer.clone())
+        // Try printer_name first, then printer.name, then station.name
+        self.printer_name.clone()
+            .or_else(|| self.printer.as_ref().and_then(|p| p.name.clone()))
+            .or_else(|| self.station.as_ref().and_then(|s| s.name.clone()))
+    }
+
+    pub fn get_image_url(&self) -> Option<String> {
+        self.image_path.clone().or(self.url.clone())
+    }
+
+    pub fn get_copies(&self) -> i32 {
+        self.copies
+            .or_else(|| self.station.as_ref().and_then(|s| s.print_copies))
+            .unwrap_or(1)
     }
 
     pub fn get_job_type(&self) -> String {
         if self.image.is_some() {
             "image".to_string()
+        } else if self.image_path.is_some() {
+            "image_url".to_string()
         } else if self.pdf.is_some() {
             "pdf".to_string()
         } else if self.html.is_some() {
@@ -254,7 +295,7 @@ impl ApiClient {
         };
 
         let response = self.client
-            .post(&url)
+            .patch(&url)
             .headers(self.create_headers())
             .json(&request)
             .send()
