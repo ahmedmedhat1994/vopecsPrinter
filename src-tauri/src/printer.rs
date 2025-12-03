@@ -39,38 +39,129 @@ pub fn print_raw(printer_name: &str, data: &[u8]) -> Result<()> {
 #[cfg(target_os = "windows")]
 pub fn print_raw(printer_name: &str, data: &[u8]) -> Result<()> {
     use std::os::windows::process::CommandExt;
+    use std::io::Write;
 
-    // Create temp file
+    // Create temp file with unique timestamp
     let temp_dir = std::env::temp_dir();
-    let temp_file = temp_dir.join(format!("vopecs_print_{}.bin", std::process::id()));
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
+    let temp_file = temp_dir.join(format!("vopecs_print_{}.prn", timestamp));
 
     // Write data to temp file
     fs::write(&temp_file, data)
         .context("Failed to write temp file")?;
 
-    // Print using Windows print command
-    // For raw printing on Windows, we use the copy command to send directly to printer
-    let output = Command::new("cmd")
-        .args([
-            "/C",
-            &format!("copy /b \"{}\" \"\\\\%COMPUTERNAME%\\{}\"",
-                temp_file.to_str().unwrap(),
-                printer_name
-            )
-        ])
+    let temp_path = temp_file.to_str().unwrap();
+    println!("Printing {} bytes to Windows printer: {}", data.len(), printer_name);
+
+    // Use PowerShell to send raw data directly to printer via .NET
+    // This is the most reliable method for thermal/ESC-POS printers on Windows
+    let ps_script = format!(
+        r#"
+        $printerName = '{}'
+        $filePath = '{}'
+
+        # Method 1: Try using RawPrinterHelper via .NET
+        Add-Type -TypeDefinition @'
+        using System;
+        using System.Runtime.InteropServices;
+
+        public class RawPrinterHelper {{
+            [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+            public static extern bool OpenPrinter(string pPrinterName, out IntPtr phPrinter, IntPtr pDefault);
+
+            [DllImport("winspool.drv", SetLastError = true)]
+            public static extern bool ClosePrinter(IntPtr hPrinter);
+
+            [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+            public static extern bool StartDocPrinter(IntPtr hPrinter, int level, ref DOCINFO pDocInfo);
+
+            [DllImport("winspool.drv", SetLastError = true)]
+            public static extern bool EndDocPrinter(IntPtr hPrinter);
+
+            [DllImport("winspool.drv", SetLastError = true)]
+            public static extern bool StartPagePrinter(IntPtr hPrinter);
+
+            [DllImport("winspool.drv", SetLastError = true)]
+            public static extern bool EndPagePrinter(IntPtr hPrinter);
+
+            [DllImport("winspool.drv", SetLastError = true)]
+            public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, int dwCount, out int dwWritten);
+
+            [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+            public struct DOCINFO {{
+                public string pDocName;
+                public string pOutputFile;
+                public string pDataType;
+            }}
+
+            public static bool SendBytesToPrinter(string printerName, byte[] bytes) {{
+                IntPtr hPrinter = IntPtr.Zero;
+                DOCINFO di = new DOCINFO();
+                di.pDocName = "VopecsPrinter RAW Document";
+                di.pDataType = "RAW";
+
+                if (!OpenPrinter(printerName, out hPrinter, IntPtr.Zero)) return false;
+
+                try {{
+                    if (!StartDocPrinter(hPrinter, 1, ref di)) return false;
+                    if (!StartPagePrinter(hPrinter)) return false;
+
+                    IntPtr pBytes = Marshal.AllocCoTaskMem(bytes.Length);
+                    Marshal.Copy(bytes, 0, pBytes, bytes.Length);
+
+                    int written = 0;
+                    bool success = WritePrinter(hPrinter, pBytes, bytes.Length, out written);
+
+                    Marshal.FreeCoTaskMem(pBytes);
+
+                    EndPagePrinter(hPrinter);
+                    EndDocPrinter(hPrinter);
+
+                    return success && written == bytes.Length;
+                }} finally {{
+                    ClosePrinter(hPrinter);
+                }}
+            }}
+        }}
+'@
+
+        $bytes = [System.IO.File]::ReadAllBytes($filePath)
+        $result = [RawPrinterHelper]::SendBytesToPrinter($printerName, $bytes)
+        if ($result) {{
+            Write-Output "SUCCESS"
+            exit 0
+        }} else {{
+            Write-Error "Failed to send to printer"
+            exit 1
+        }}
+        "#,
+        printer_name.replace("'", "''"),
+        temp_path.replace("\\", "\\\\").replace("'", "''")
+    );
+
+    let output = Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", &ps_script])
         .creation_flags(0x08000000) // CREATE_NO_WINDOW
         .output()
-        .context("Failed to execute print command")?;
+        .context("Failed to execute PowerShell")?;
 
     // Clean up temp file
     let _ = fs::remove_file(&temp_file);
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("Print command failed: {}", stderr);
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if stdout.contains("SUCCESS") {
+            println!("✅ RAW print to Windows printer succeeded");
+            return Ok(());
+        }
     }
 
-    Ok(())
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    anyhow::bail!("Print failed: {} {}", stdout, stderr)
 }
 
 /// Print raw data to printer (Linux)

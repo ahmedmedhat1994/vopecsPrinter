@@ -20,6 +20,7 @@ let apiPrinters = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
   log('Starting VopecsPrinter...');
+  await loadAppVersion();
   await loadConfig();
   await loadSystemPrinters();
   await checkAutostart();
@@ -30,6 +31,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     startService();
   }
 });
+
+// Load and display app version
+async function loadAppVersion() {
+  try {
+    const { getVersion } = window.__TAURI__.app;
+    const version = await getVersion();
+    document.getElementById('app-version').textContent = 'v' + version;
+    document.getElementById('logs-version').textContent = 'v' + version;
+
+    // Detect OS
+    const { platform } = window.__TAURI__.os;
+    const os = await platform();
+    const osName = os === 'darwin' ? 'macOS' : os === 'win32' ? 'Windows' : os;
+    document.querySelector('.os-badge').textContent = osName;
+  } catch (error) {
+    console.log('Failed to get app version:', error);
+  }
+}
 
 // ============ Event Listeners ============
 
@@ -59,10 +78,32 @@ function setupEventListeners() {
   // Updates
   document.getElementById('check-updates').addEventListener('click', checkUpdates);
 
+  // Fullscreen logs
+  document.getElementById('toggle-fullscreen').addEventListener('click', toggleFullscreen);
+
   // Close modal on outside click
   document.getElementById('config-modal').addEventListener('click', (e) => {
     if (e.target.id === 'config-modal') closeConfigModal();
   });
+}
+
+// Toggle fullscreen mode
+let isFullscreen = false;
+async function toggleFullscreen() {
+  try {
+    const { getCurrentWindow } = window.__TAURI__.window;
+    const appWindow = getCurrentWindow();
+
+    isFullscreen = !isFullscreen;
+    await appWindow.setFullscreen(isFullscreen);
+
+    const btn = document.getElementById('toggle-fullscreen');
+    btn.innerHTML = isFullscreen
+      ? '<span class="icon">&#x26F6;</span> Exit Full Screen'
+      : '<span class="icon">&#x26F6;</span> Full Screen';
+  } catch (error) {
+    log('Failed to toggle fullscreen: ' + error, 'error');
+  }
 }
 
 // ============ Configuration ============
