@@ -1,6 +1,6 @@
 {
   "name": "vopecs-printer",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "VopecsPOS Thermal Printer Manager - Cross-platform print utility for POS systems",
   "author": "Vopecs",
   "license": "MIT",

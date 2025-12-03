@@ -283,14 +283,22 @@ pub fn get_system_printers() -> Result<Vec<String>> {
 
 /// Print a test page to the specified printer
 pub fn print_test_page(printer_name: &str) -> Result<()> {
-    let test_data = ThermalImage::test_pattern(576);
+    let mut test_data = ThermalImage::test_pattern(576);
+
+    // Add cut command at the end
+    test_data.extend_from_slice(&generate_cut_command());
+
     print_raw(printer_name, &test_data)?;
     Ok(())
 }
 
 /// Print base64 image to thermal printer
 pub fn print_base64_image(printer_name: &str, base64_image: &str, max_width: u32) -> Result<()> {
-    let escpos_data = ThermalImage::base64_to_escpos(base64_image, max_width)?;
+    let mut escpos_data = ThermalImage::base64_to_escpos(base64_image, max_width)?;
+
+    // Add cut command at the end
+    escpos_data.extend_from_slice(&generate_cut_command());
+
     print_raw(printer_name, &escpos_data)?;
     Ok(())
 }
@@ -298,8 +306,12 @@ pub fn print_base64_image(printer_name: &str, base64_image: &str, max_width: u32
 /// Print image from URL to thermal printer
 pub async fn print_url_image(printer_name: &str, url: &str, max_width: u32) -> Result<()> {
     println!("🖨️ Printing image from URL: {}", url);
-    let escpos_data = ThermalImage::url_to_escpos(url, max_width).await?;
-    println!("Printing raw data to printer: {}", printer_name);
+    let mut escpos_data = ThermalImage::url_to_escpos(url, max_width).await?;
+
+    // Add cut command at the end
+    escpos_data.extend_from_slice(&generate_cut_command());
+
+    println!("Printing raw data to printer: {} ({} bytes including cut)", printer_name, escpos_data.len());
     print_raw(printer_name, &escpos_data)?;
     println!("✅ Print command executed successfully");
     println!("✅ Image from URL printed successfully");
